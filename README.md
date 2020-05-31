@@ -9,4 +9,4 @@ Following up the work of Baek and colaborators (2015), this analysis will focus 
 
 Taking into account the work of Baek and colaborators (2015), the main goal of present work is to analyse the RNA-seq data obtained from GC patients and healthy samples. Moreover, it aims at finding differences between proximal and distal regulatory regions of GC patient samples and healthy cases. For this, RNA-seq data of normal and tumoral tissues was analysed and characterized.
 
-#To check out the final report, please download the ... and open it.
+# To check out the final report, please download the ... and open it.
