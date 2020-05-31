@@ -1,0 +1,15 @@
+SRR1041585;csc1_sc2;cancer
+SRR1041586;csc1_dc2;cancer
+SRR1041587;csc1_sc3;cancer
+SRR1041588;csc1_dc3;cancer
+SRR846922;csc1_dc;cancer
+SRR846923;csc1_mc;cancer
+SRR846924;csc1_sc;cancer
+SRR846925;csc2_dc;cancer
+SRR846926;csc2_mc;cancer
+SRR846927;csc2_sc;cancer
+SRR846928;csc3_dc;cancer
+SRR846929;csc3_mc;cancer
+SRR846930;csc3_sc;cancer
+SRR846931;normal1;normal
+SRR846932;normal2;normal

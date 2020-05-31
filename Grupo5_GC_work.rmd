@@ -1,0 +1,315 @@
+---
+title: "Relatorio do Grupo 5"
+author: "Ana Fernandes PG38284, João Capela PG38274, Tiago Ferreira PG33765, Tiago Oliveira PG24096"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    collapsed: false
+    depth: 3
+    number_sections: true 
+    theme: flatly 
+    highlight: tango
+    df_print: paged
+    code_download: true
+    code_folding: show
+---
+
+
+```{r, include=FALSE}
+BiocManager::install(c("hgu95av2.db"))
+library(topGO)
+library(genefilter)
+library(hgu95av2.db)
+library(DESeq2)
+``` 
+
+
+# Introdução
+  Cancro Gástrico (GC), tem vindo a ser conhecido como uma das maiores causas de incidência de cancro no mundo, sendo identificada como a terceira maior causa de morte por via de doença oncológica. Exsistem alguns fatores associados com a formação e progressão de GC, nomeadamente fatores moleculares, genéticos, ambientais e ainda alterações epigenéticas.
+No campo das mudanças epigenéticas que possam vir a promover este tipo de cancro, existem também alguns fatores, tais como Metilações de DNA, modificações de histonas, posicionamento de nucleossomas e RNA não codificante.
+Seguindo o trabalho de Baek e colaboradores (2015), esta análise focar-se-á na metilação de DNA. Este fenómeno tem vindo a ser bastante reportado na literatura como uma das maiores forças motrizes na carcinogénese e formação tumoral, nomeadamente no ataque a conhecidos supressores tumorais por via de hipermetilação, inibindo-os.
+  Tendo em conta o trabalho referido anteriormente, o objetivo deste estudo assenta no tratamento dos dados de RNA-seq obtidos para GC e procurar entender diferenças (caso estas existam), entre regiões regulatórias proximais e distais entre pacientes de Cancro Gástrico e casos saudáveis (normais). Para isto, amostras de tecido normal e tecido tumoral foram analizadas e caracterizadas segundo a seguinte nomenclatura: \textit(purified gastric cancer cell (sc), cultured gastric cancer cell (dc) e mixture of several gastric cancer cell clones (mc)) de três pacientes (csc1, csc2, csc3)  e dois replicados (csc1_sc2, csc1_sc3) (Tabela 1)[1]. 
+
+![Tabela 1. Representação da nomenclatura dos dados.](tabela.png)
+
+
+
+# Métodos
+
+Os dados do estudo são constituídos por 15 bibliotecas de RNA-Seq paired-end, que foram preparadas por PCR usando TruSeq RNA Sample Prep Kit (Illumina, San Diego, CA, USA) e sequenciadas usando Hiseq-2000 (Illumina). Cada biblioteca encontra-se no formato “.fastq.gz”.
+
+## Controlo de Qualidade dos dados
+
+Foi criado um relatório de controlo de qualidade para cada biblioteca utilizando FastQC (versão: 0.11.8) e exportado para a pasta “fastQC_reports/”, utilizando o comando:
+
+```{bash, eval=FALSE}
+fastqc -o fastQC_reports/ SRR*
+```
+
+## Limpeza das Reads
+
+As reads das bibliotecas foram filtradas por qualidade e as sequências de adaptadores foram cortadas com Trimmomatic (versão:0.39), utilizando o seguinte codigo:
+
+
+
+```{bash, eval=FALSE}
+for i in {5..8}
+do 
+	trimmomatic PE SRR104158$i\_1.fastq.gz SRR104158$i\_2.fastq.gz Trim/SRR104158$i\_1P Trim/SRR104158$i\_1U Trim/SRR104158$i\_2P Trim/SRR104158$i\_2U ILLUMINACLIP:TruSeq3-PE-2.fa:2:30:10:2:keepBothReads LEADING:0 TRAILING:0 SLIDINGWINDOW:0:0
+done
+
+for i in {22..32}
+do 
+	trimmomatic PE SRR8469$i\_1.fastq.gz SRR8469$i\_2.fastq.gz Trim/SRR8469$i\_1P Trim/SRR8469$i\_1U Trim/SRR8469$i\_2P Trim/SRR8469$i\_2U ILLUMINACLIP:TruSeq3-PE-2.fa:2:30:10:2:keepBothReads LEADING:0 TRAILING:0 SLIDINGWINDOW:0:0 
+done
+```
+
+Nenhum parâmetro de limite de qualidade das reads foi inserido, de modo a que o Trimmomatic pudesse determinar automaticamente o melhor limite a aplicar para cada biblioteca.
+
+Para a remoção de sequências de adaptadores, indicaram-se as sequências utilizadas pelo kit de pcr utilizado na experiencia e utilizaram-se parametros de limite de mismatch e score entre as reads e adaptadores. Foi também indicado que o trimmomatic deveria considerar qualquer adaptador com um tamanho minimo baixo (2) e que mantenha as reads reversas. 
+
+Tendo em conta os resultados dos reports do fastQC não foi aplicado nenhum corte de sequências por qualidade.
+
+Após as operações do trimmomatic, os resultados foram analisados novamente de modo a verificar a qualidade e possíveis erros, utilizando o seguinte codigo:
+
+````{bash, eval=FALSE}
+fastqc -o fastQC_reports/ Trim/SRR*"P"
+````
+
+
+
+## Alinhamento
+
+Como referência foi utilizado o ficheiro FASTA referente ao cromossoma 3 da assembly GRCh38 do genoma humano. Esta referência foi indexada e utilizada para o alinhamento das bibliotecas com BWA (versão:0.7.17-r1188).
+
+Os comandos utilizados para a Indexação, alinhamento e criação dos ficheiros ".bam" finais encontram-se em baixo.
+
+````{bash, eval=FALSE}
+bwa index Index/Homo_sapiens.GRCh38.dna.chromosome.3.fa.gz  # Indexacao
+
+ls *.fastq.gz | cut -d "_" -f1 | uniq > fastq_names.txt # Lista de amostras
+
+
+for fq in $(cat fastq_names.txt)
+do
+	bwa aln Index/Homo_sapiens.GRCh38.dna.chromosome.3.fa.gz Trim/$fq"_1P" > aln_ch3/$fq"_1.sai"
+	bwa aln Index/Homo_sapiens.GRCh38.dna.chromosome.3.fa.gz Trim/$fq"_2P" > aln_ch3/$fq"_2.sai"
+done
+
+
+for fq in $(cat fastq_names.txt)
+do
+	bwa sampe Index/Homo_sapiens.GRCh38.dna.chromosome.3.fa.gz aln_ch3/$fq"_1.sai" aln_ch3/$fq"_2.sai" Trim/$fq"_1P" Trim/$fq"_2P" | samtools view -S -b > bams_chr3/$fq".bam"
+done
+````
+
+## Contagens
+
+Para as contagens dos genes foi utilizado como referência o ficheiro .gtf referente à assembly GRCh38 do genoma humano. As features foram contadas utilizando HTSeq-count (versão:0.11.2) utilizando o seguinte código:
+
+````{bash, eval=FALSE}
+for fq in $(cat fastq_names.txt)
+do
+	htseq-count -f bam -s no bams_chr3/$fq".bam" gff/Homo_sapiens.GRCh38.96.gtf.gz > readcounts/$fq"_readcounts"
+done
+
+echo "geneID csc1_sc2 csc1_dc2 csc1_sc3 csc1_dc3 csc1-dc csc1-mc csc1-sc csc2-dc csc2-mc csc2-sc csc3-dc csc3-mc csc3-sc normal1 normal2" > reads.tab
+paste *_readcounts | cut -f1,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30 >> reads.tab
+
+grep "^ENS" reads.tab > reads_final.tab
+
+````
+
+As contagens foram normalizadas por RPKM. O número de reads por amostra foi determinado usando samtools.
+
+```{bash, eval=FALSE}
+for fq in $(cat fastq_names.txt)
+do
+  samtools view -c bams_chr3/$fq".bam"
+```
+
+
+O RPKM para cada feature foi calculado usando o seguinte código python:
+
+```{python, eval=FALSE}
+import csv
+if __name__ == '__main__':
+	dic_features = {}
+	with open("gff/Homo_sapiens.GRCh38.96.gtf", "r") as gtf:
+		for line in gtf:
+			if not line[0].startswith("#"):
+				line = line.split("\t")
+				id = line[8].split(" ")[1].strip(";")[1:-1]
+				dic_features[id] = int(line[4]) - int(line[3])
+
+
+	with open("readcounts/reads_final.tab", "r") as read_counts:
+		with open("readcounts/rpkm_reads.tab", "w+") as rpkm_counts:
+			table = []
+			total_reads = [76631818, 73488960, 77161352, 77611646, 58909066,
+						   79698582, 68670218, 77929308, 56466226, 43113480,
+						   38844902, 61500262, 64124276, 29181404, 42569474]
+			for line in read_counts:
+				line = line.split("\t")
+				if line[0] in dic_features.keys():
+					if dic_features[line[0]] != 0:
+						for i in range(1,16):
+							if line[1] != 0:
+								line[i] = (10**6*int(line[i])/(total_reads[i-1]*dic_features[line[0]]))
+				line[15] = int(str(line[15]).strip("\n"))
+				table.append(line)
+			cw = csv.writer(rpkm_counts)
+			cw.writerows(table)
+```
+
+
+
+# Análise de Dados
+
+## Relatorios de Qualidade das reads
+
+Os relatórios resultantes do fastQC para as bibliotecas inicias, demonstram que estas aparentemente não contêm adaptadores, com todas as reads possuindo entre 62 e 79 pares de bases de comprimento e boa qualidade em todas as métricas.
+Embora o relatório tenha indicado nos campos "Per base sequence content" e "Sequence Duplication Levels" como tendo possiveis problemas, ao analisar os relatórios estes resultados seriam os esperados em dados de RNA-Seq.
+
+Os relatórios de qualidade após a aplicação do Trimmomatic em algumas bibliotecas apresentam valores de qualidade inferiores aos originais, embora que ainda aceitáveis, de "Per base sequence quality" (exemplo SRR846923_2P e SRR846925_2P).
+
+## Carregamento de dados e de um objeto DeSeqDataSet
+
+As contagens foram importadas para R e analisadas utilizando DeSeq2 (versão: 1.22.2). A análise foi feita segundo os seguintes passos:
+
+```{r}
+reads <- read.table("reads_final.tab", h=T, row.names=1, sep = "\t")
+```
+
+E em seguida definiram-se as condições de comparação
+
+```{r}
+metadata<-read.table("metadata.txt", sep = ";")
+colnames(metadata)<-c("ID","sample","disease")
+colnames(reads)=c("csc1_sc2","csc1_dc2","csc1_sc3","csc1_dc3", "csc1-dc","csc1-mc","csc1-sc", "csc2-dc","csc2-mc", "csc2-sc", "csc3-dc","csc3-mc", "csc3-sc", "normal1", "normal2")
+```
+
+Antes de correr as funções DeSeq, filtraram-se préviamente os genes com 'counts' mais baixos
+
+```{r}
+reads <- reads[ rowSums(reads) > 1, ]
+```
+
+## Teste de Expressão Diferencial
+
+Em seguida, procedeu-se à execução do teste de expressão diferencial e posterior organização de dados por ordem crescente de valor-p
+
+```{r}
+dds <- DESeqDataSetFromMatrix(countData = reads,colData = metadata, design = ~ disease)
+dds <- DESeq(dds)
+# Expressão diferencial de amostras que pertencem a CI vs C2
+res <- results(dds)
+res
+# Oraganização de tabelas por ordem do menor valor-p
+resOrdered <- res[order(res$padj),]
+# Sumarização de dados 
+summary(res)
+# Tem-se muitos valores com p-value inferior a 0.1?
+sum(res$padj < 0.1, na.rm=TRUE)
+```
+
+
+## Exploração e exportação de resultados
+
+```{r}
+# MA-plot
+plotMA(res, main="DESeq2", ylim=c(-2,2))
+```
+
+O \textit(MA plot) pode representar uma visão geral das diferenças entre as amostras em termos de \textit(read counts). Neste gráfico, pode-se verificar que existem vários genes sub e sobre expressos. Se os pontos estivessem distribuídos na zona de y = 0, as amostras seriam bastante similares em termos de expressão génica.
+
+
+```{r}
+# representar graficamente os read-counts para o gene mais sigfnificante
+plotCounts(dds, gene=which.min(res$padj), intgroup="disease")
+# Exportaçao para um .CSV
+write.csv(as.data.frame(resOrdered),file="disease_treated_results.csv")
+```
+
+## Transofrmação de dados e visualização
+
+Transformação das contagens:
+Para testar expressão diferencial, operou-se sobre 'raw counts' e usaram-se distribuições discretas. Para visualização ou clustering, talvez será melhor trabalhar sobre dados transformados.
+
+```{r}
+# VST: varianceStabilizingTransformation
+vsd <- varianceStabilizingTransformation(dds, blind=FALSE)
+head(assay(vsd), 20)
+# comparar o comando previo com head(counts(dds), 3)
+# Heatmap da matriz dos counts
+select <- rownames(head(resOrdered,20))
+vsd.counts <- assay(vsd)[select,]
+colnames(vsd.counts)<-metadata$disease
+df <- as.data.frame(colData(dds)[,c("disease")])
+# manter a ordenação das linhas
+library(pheatmap)
+pheatmap(vsd.counts, cluster_rows=FALSE,show_colnames = T)
+# cluster por linha e coluna
+pheatmap(vsd.counts)
+```
+
+Os resultados da análise diferencial revelam que o gene com o ENSEMBLE ID ENSG00000269028 foi sobre expresso em células de cancro. O gene é o MTRNR2L12 e a respetiva proteína codificada por ele tem como denominação \textit(Humanin-like 12). Esta proteína é codificada por uma pequena open reading frame (ORF) no DNA mitocondrial (mt).[3]
+A sua função trata-se de suprimir a apoptose [2]. Uma vez que uma disrupção da apoptose está diretamente ligada a cancro [4], este resultado é esperado.
+
+
+
+## Heatmaps sobre distancia Eucledianas entre amostras
+
+
+```{r}
+# calcular a distancia entre amostras
+sampleDists <- dist(t(assay(vsd)))
+
+# preparar a matriz de distancias
+sampleDistMatrix <- as.matrix(sampleDists)
+rownames(sampleDistMatrix) <- dds$sample
+colnames(sampleDistMatrix) <- NULL
+```
+
+```{r}
+library(RColorBrewer)
+colors <- colorRampPalette( rev(brewer.pal(9, "RdBu")) )(255)
+pheatmap(sampleDistMatrix, clustering_distance_rows=sampleDists,
+         clustering_distance_cols=sampleDists, col=colors)
+```
+
+No heatmap acima, é possível verificar que amostras normais tendem a agrupar-se, ao passo que as restantes também agrupam entre si. No entanto, os replicados 2 e 3, recolhidos do primeiro paciente, tendem a agrupar-se ao passo que as restantes (dos pacientes 1, 2 e 3) também formam um cluster diferente.
+
+
+## Analise de componentes principais
+
+```{r}
+plotPCA(vsd, intgroup=c("disease"))
+
+```
+
+A Principal Component Analysis (PCA) revelou uma separação natural entre pacientes com cancro gástrico e normais.
+
+De modo a encontrar a anotação dos genes, foi utilizado o seguinte comando:
+
+```{r}
+anno <- AnnotationDbi::select(hgu95av2.db, 
+                              keys=rownames(resOrdered), 
+                              columns=c("SYMBOL","SYMBOL", "GENENAME"),
+                              keytype="ENSEMBL")
+
+```
+
+# Discussão
+
+Os resultados da análise Genómica dos dados de RNA-seq, apesar de terem um comportamento de acordo com o que seria de se esperar, não mostram um panorama geral que possa ser conclusivo. Este fator dever-se-á muito provavelmente ao facto de apenas se estar a avaliar um único cromossoma. Uma posterior \textit(genome-wide analysis) trará resultados muito mais conclusivos e poderá ser um dado relevante no entendimento de como mudanças epigenómicas em regiões proximais e distais do genoma humano poderão ter um papel importante no desenvolvimento de cancro gástrico em Humanos.
+
+[1]Baek, S., Kim, M., Bae, D., Kim, J., Kim, H., Han, M., Oh, S., Kim, Y. and Kim, S. (2015). Integrated epigenomic analyses of enhancer as well as promoter regions in gastric cancer. Oncotarget
+
+[2]Guo B, Zhai D, Cabezas E, Welsh K, Nouraini S, Satterthwait AC, Reed JC (May 2003). "Humanin peptide suppresses apoptosis by interfering with Bax activation". Nature. 423 (6938)
+
+[3]Bodzioch M, Lapicka-Bodzioch K, Zapala B, Kamysz W, Kiec-Wilk B, Dembinska-Kiec A (October 2009). "Evidence for potential functionality of nuclearly-encoded humanin isoforms". Genomics. 94 (4): 247-56. doi:10.1016/j.ygeno.2009.05.006. PMID 19477263.
+
+[4]Scott W. Lowe, Athena W. Lin, Apoptosis in cancer , Carcinogenesis, Volume 21, Issue 3, March 2000, Pages 485-495
