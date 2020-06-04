@@ -1,5 +1,5 @@
 ---
-title: "Relatorio do Grupo 5"
+title: "Final Report"
 author: "Ana Fernandes PG38284, João Capela PG38274, Tiago Ferreira PG33765, Tiago Oliveira PG24096"
 date: "`r Sys.Date()`"
 output:
@@ -18,7 +18,7 @@ output:
 
 
 ```{r, include=FALSE}
-BiocManager::install(c("hgu95av2.db"))
+BiocManager::install(c("hgu95av2.db","topGO","genefilter","DESeq2"))
 library(topGO)
 library(genefilter)
 library(hgu95av2.db)
@@ -26,13 +26,13 @@ library(DESeq2)
 ``` 
 
 
-# Introdução
+# Introduction
   Gastric Cancer (GC) is recognized as one of the causes of cancer incidence around the globe. Moreover, it was identified as the third major cause of death by oncological disease. To the best of our knowledge, there are several factors associated to the formation and progression of GC, namely molecular, genetic, environmental factors, and epigenetic alterations. 
-  As for epigenetic alterations, DNA metilations, histone modifications, nucleossome positioning and non codifying RNA. Following up the work of Baek and colaborators (2015), this analysis will focus in DNA metylation. This phenomenon has been reported as one of the major causes of carcinogenesis.
-  Taking into account the work of Baek and colaborators (2015), the main goal of present work is to analyse the RNA-seq data obtained from GC patients and healthy samples. Moreover, it aims at finding differences between proximal and distal regulatory regions of GC patient samples and healthy cases. For this, RNA-seq data of normal and tumoral tissues was analysed and characterized. This data was divided into the following groups: \textit(purified gastric cancer cell (sc), cultured gastric cancer cell (dc) e mixture of several gastric cancer cell clones (mc)) de três pacientes (csc1, csc2, csc3)  e dois replicados (csc1_sc2, csc1_sc3) (Table 1)[1].
+  As for epigenetic alterations, DNA methylations, histone modifications, nucleossome positioning and non codifying RNA. Following up the work of Baek and collaborators (2015), this analysis will focus on DNA methylation. This phenomenon has been reported as one of the major causes of carcinogenesis.
+  Taking into account the work of Baek and collaborators (2015), the main goal of present work is to analyze the RNA-seq data obtained from GC patients and healthy samples. Moreover, it aims at finding differences between proximal and distal regulatory regions of GC patient samples and healthy cases. For this, RNA-seq data of normal and tumoral tissues was analyzed and characterized. This data was divided into the following groups: \textit(purified gastric cancer cell (sc), cultured gastric cancer cell (dc) e mixture of several gastric cancer cell clones (mc)) of three patients (csc1, csc2, csc3)  and two replicates (csc1_sc2, csc1_sc3) (Table 1)[1].
   
 
-![Table 1 - data organization.](tabela.png)
+![Table 1 - data organization.](table1.png)
 
 
 
@@ -168,25 +168,26 @@ if __name__ == '__main__':
 ```
 
 
+# Data Analysis
 
-# Análise de Dados
+## Reads Quality reports
 
-## Relatorios de Qualidade das reads
+The resultant reports from the fastQC, demonstrate that the initial libraries do not contain adaptors. All the reads possessed between 62 and 79 base pairs and good quaity in all of the metrics.
+Even though the report has indicated, in the "Per base sequence content" and "Sequence Duplication Levels" fields, that some problems could be pointed, by analysing thouroghly the reports, we concluded that these results were expected in RNA-Seq data. 
 
-Os relatórios resultantes do fastQC para as bibliotecas inicias, demonstram que estas aparentemente não contêm adaptadores, com todas as reads possuindo entre 62 e 79 pares de bases de comprimento e boa qualidade em todas as métricas.
-Embora o relatório tenha indicado nos campos "Per base sequence content" e "Sequence Duplication Levels" como tendo possiveis problemas, ao analisar os relatórios estes resultados seriam os esperados em dados de RNA-Seq.
+After the usage of the Trimmomatic, some libraries have presented quality values lower than the original ones. 
 
-Os relatórios de qualidade após a aplicação do Trimmomatic em algumas bibliotecas apresentam valores de qualidade inferiores aos originais, embora que ainda aceitáveis, de "Per base sequence quality" (exemplo SRR846923_2P e SRR846925_2P).
 
-## Carregamento de dados e de um objeto DeSeqDataSet
+## Loading the data and a DeSeqDataSet object
 
-As contagens foram importadas para R e analisadas utilizando DeSeq2 (versão: 1.22.2). A análise foi feita segundo os seguintes passos:
+The countings were imported and analysed using DeSeq2 (version: 1.22.2):
+
 
 ```{r}
 reads <- read.table("reads_final.tab", h=T, row.names=1, sep = "\t")
 ```
 
-E em seguida definiram-se as condições de comparação
+Then some conditions were set to compare the data.
 
 ```{r}
 metadata<-read.table("metadata.txt", sep = ";")
@@ -194,15 +195,15 @@ colnames(metadata)<-c("ID","sample","disease")
 colnames(reads)=c("csc1_sc2","csc1_dc2","csc1_sc3","csc1_dc3", "csc1-dc","csc1-mc","csc1-sc", "csc2-dc","csc2-mc", "csc2-sc", "csc3-dc","csc3-mc", "csc3-sc", "normal1", "normal2")
 ```
 
-Antes de correr as funções DeSeq, filtraram-se préviamente os genes com 'counts' mais baixos
+Before running the DeSeq functions, the genes with the lowest counts were filtered.
+
 
 ```{r}
 reads <- reads[ rowSums(reads) > 1, ]
 ```
 
-## Teste de Expressão Diferencial
+## Diferential Expression Analysis
 
-Em seguida, procedeu-se à execução do teste de expressão diferencial e posterior organização de dados por ordem crescente de valor-p
 
 ```{r}
 dds <- DESeqDataSetFromMatrix(countData = reads,colData = metadata, design = ~ disease)
@@ -219,14 +220,14 @@ sum(res$padj < 0.1, na.rm=TRUE)
 ```
 
 
-## Exploração e exportação de resultados
+## Results exploration
 
 ```{r}
 # MA-plot
 plotMA(res, main="DESeq2", ylim=c(-2,2))
 ```
 
-O \textit(MA plot) pode representar uma visão geral das diferenças entre as amostras em termos de \textit(read counts). Neste gráfico, pode-se verificar que existem vários genes sub e sobre expressos. Se os pontos estivessem distribuídos na zona de y = 0, as amostras seriam bastante similares em termos de expressão génica.
+As for the read counts, the MA plot can represent a global vision of the differences between the samples. In this graph, it is easy to check that there are various subexpressed and overexpressed genes. 
 
 
 ```{r}
@@ -236,10 +237,10 @@ plotCounts(dds, gene=which.min(res$padj), intgroup="disease")
 write.csv(as.data.frame(resOrdered),file="disease_treated_results.csv")
 ```
 
-## Transofrmação de dados e visualização
+## Data transformation and visualization
 
-Transformação das contagens:
-Para testar expressão diferencial, operou-se sobre 'raw counts' e usaram-se distribuições discretas. Para visualização ou clustering, talvez será melhor trabalhar sobre dados transformados.
+Counting transformation:
+In order to test differential expression, discrete distributions were used for the "raw counts".
 
 ```{r}
 # VST: varianceStabilizingTransformation
@@ -258,12 +259,9 @@ pheatmap(vsd.counts, cluster_rows=FALSE,show_colnames = T)
 pheatmap(vsd.counts)
 ```
 
-Os resultados da análise diferencial revelam que o gene com o ENSEMBLE ID ENSG00000269028 foi sobre expresso em células de cancro. O gene é o MTRNR2L12 e a respetiva proteína codificada por ele tem como denominação \textit(Humanin-like 12). Esta proteína é codificada por uma pequena open reading frame (ORF) no DNA mitocondrial (mt).[3]
-A sua função trata-se de suprimir a apoptose [2]. Uma vez que uma disrupção da apoptose está diretamente ligada a cancro [4], este resultado é esperado.
+The results from the differential expression analysis revealed that the gene with the ENSG00000269028 ENSEMBLE ID was overexpressed for the cancer cells. The gene is MTRNR2L12 and the codified protein is dubbed as \textit(Humanin-like 12). This protein is codified by a small Open Reading Frame (ORF) in the mitochondrial DNA (mtDNA) [3]. Its function is to supress apoptosis [2]. Once that an apoptosis disruption is directly linked with cancer [4], this is the expected result.
 
-
-
-## Heatmaps sobre distancia Eucledianas entre amostras
+## Heatmaps about the Eucledian distance between samples
 
 
 ```{r}
@@ -283,19 +281,19 @@ pheatmap(sampleDistMatrix, clustering_distance_rows=sampleDists,
          clustering_distance_cols=sampleDists, col=colors)
 ```
 
-No heatmap acima, é possível verificar que amostras normais tendem a agrupar-se, ao passo que as restantes também agrupam entre si. No entanto, os replicados 2 e 3, recolhidos do primeiro paciente, tendem a agrupar-se ao passo que as restantes (dos pacientes 1, 2 e 3) também formam um cluster diferente.
+In the above heatmap, it is possible to verify that the normal samples data tends to group, as well as the other samples. However, the 2 and 3 replicates, collected from the first patient, group themselves, as well as the rest generate another cluster.
 
-
-## Analise de componentes principais
+## Principal Component Analysis
 
 ```{r}
 plotPCA(vsd, intgroup=c("disease"))
 
 ```
 
-A Principal Component Analysis (PCA) revelou uma separação natural entre pacientes com cancro gástrico e normais.
 
-De modo a encontrar a anotação dos genes, foi utilizado o seguinte comando:
+The Principal Component Analysis (PCA) revealed a natural separation between the healthy people samples and the other from the Gastric Cancer patients.
+
+In order to annotate the relevant genes, the following command was used:
 
 ```{r}
 anno <- AnnotationDbi::select(hgu95av2.db, 
@@ -305,9 +303,13 @@ anno <- AnnotationDbi::select(hgu95av2.db,
 
 ```
 
-# Discussão
 
-Os resultados da análise Genómica dos dados de RNA-seq, apesar de terem um comportamento de acordo com o que seria de se esperar, não mostram um panorama geral que possa ser conclusivo. Este fator dever-se-á muito provavelmente ao facto de apenas se estar a avaliar um único cromossoma. Uma posterior \textit(genome-wide analysis) trará resultados muito mais conclusivos e poderá ser um dado relevante no entendimento de como mudanças epigenómicas em regiões proximais e distais do genoma humano poderão ter um papel importante no desenvolvimento de cancro gástrico em Humanos.
+# Discussion
+
+
+The results from the RNA-Seq data analysis did not allow to take relevant conclusions, even though the results correponded with the expected.
+In order to come across with better conclusions, a \textit(genome-wide analysis) must be performed. Furthermore, an analysis such as the mentioned would give us importatant insights into the understanding of how epigenomic alterations in proximal and distal regions of the human genome could have an importatn role in the development of GC.
+
 
 [1]Baek, S., Kim, M., Bae, D., Kim, J., Kim, H., Han, M., Oh, S., Kim, Y. and Kim, S. (2015). Integrated epigenomic analyses of enhancer as well as promoter regions in gastric cancer. Oncotarget
 
